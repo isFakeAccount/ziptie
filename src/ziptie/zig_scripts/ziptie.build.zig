@@ -1,10 +1,11 @@
+const allocPrint = std.fmt.allocPrint;
 const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
-const LazyPath = std.Build.LazyPath;
 const debugPrint = std.debug.print;
+const LazyPath = std.Build.LazyPath;
+const runProcess = if (builtin.zig_version.minor >= 12) std.process.Child.run else std.process.Child.exec;
 const std = @import("std");
 const step = std.Build.Step;
-const runProcess = if (builtin.zig_version.minor >= 12) std.process.Child.run else std.process.Child.exec;
 
 /// A structure for storing python module configurations.
 /// Each Python module compiles to one shared library that may consist of multiple .c and .h files.
@@ -81,11 +82,37 @@ pub const ZiptieBuildConfig = struct {
         ext_module_lib.addRPath(LazyPath{ .path = self.*.python_include_dir });
         ext_module_lib.linker_allow_shlib_undefined = true;
 
+        // renaming the shared library based on target and module
+        const so_file_extension = try self.getExtSuffix();
+        const so_filename = try self.*.allocator.alloc(u8, short_name.len + so_file_extension.len);
+
+        @memcpy(so_filename[0..short_name.len], short_name);
+        @memcpy(so_filename[short_name.len..], so_file_extension);
+
         const install = b.addInstallArtifact(ext_module_lib, .{
-            .dest_sub_path = short_name,
+            .dest_sub_path = so_filename,
         });
-        debugPrint("Prefix: {s}\n", .{self.*.build.lib_dir});
         b.getInstallStep().dependOn(&install.step);
+    }
+
+    /// Gets the shared library file extension based on the target arch, os, and abi
+    fn getExtSuffix(self: *ZiptieBuildConfig) ![]const u8 {
+        const alloc = self.*.allocator;
+        const target_str = try allocPrint(
+            alloc,
+            "{s}-{s}-{s}",
+            .{ @tagName(self.*.target.getCpuArch()), @tagName(self.*.target.getOsTag()), @tagName(self.*.target.getAbi()) },
+        );
+        const command_str = try allocPrint(
+            alloc,
+            "ziptie python-sysconfig --ext-suffix {s}",
+            .{target_str},
+        );
+        defer {
+            alloc.free(target_str);
+            alloc.free(command_str);
+        }
+        return self.pythonOutput(command_str);
     }
 
     fn pythonOutput(self: *ZiptieBuildConfig, code: []const u8) ![]const u8 {
@@ -99,21 +126,22 @@ fn getPythonOutput(allocator: std.mem.Allocator, python_exe: []const u8, code: [
         .allocator = allocator,
         .argv = &.{ python_exe, "-c", code },
     });
+    defer allocator.free(result.stderr);
     if (result.term.Exited != 0) {
         debugPrint("Failed to execute {s}:\n{s}\n", .{ code, result.stderr });
         std.process.exit(1);
     }
-    allocator.free(result.stderr);
     return result.stdout;
 }
 
 /// Executes a command specified by an argument vector and returns the standard output.
 fn getStdOutput(allocator: std.mem.Allocator, argv: []const []const u8) ![]const u8 {
     const result = try runProcess(.{ .allocator = allocator, .argv = argv });
+    defer allocator.free(result.stderr);
     if (result.term.Exited != 0) {
         debugPrint("Failed to execute {any}:\n{s}\n", .{ argv, result.stderr });
         std.process.exit(1);
     }
-    allocator.free(result.stderr);
+
     return result.stdout;
 }
