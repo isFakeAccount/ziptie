@@ -56,10 +56,10 @@ pub const ZiptieBuildConfig = struct {
         };
 
         self.python_include_dir = self.pythonOutput(
-            "import sysconfig; print(sysconfig.get_path('include'), end='')",
+            "ziptie python-sysconfig --include-dir",
         ) catch @panic("Failed to setup Python");
         self.python_library_dir = self.pythonOutput(
-            "import sysconfig; print(sysconfig.get_config_var('LIBDIR'), end='')",
+            "ziptie python-sysconfig --lib-dir",
         ) catch @panic("Failed to setup Python");
 
         return self;
