@@ -15,15 +15,14 @@ def handle_commands(args: Namespace) -> None:
         print(get_lib_dir(), end="")
 
 
-
 def get_include_dir() -> str:
     """Get the Python include directory.
 
     Returns:
         str: The Python include directory path.
     """
-    return get_path('include')
-        
+    return get_path("include")
+
 
 def get_lib_dir() -> str:
     """Get the Python lib directory based on os.
@@ -32,9 +31,9 @@ def get_lib_dir() -> str:
         str: Python lib directory path.
     """
     if system() == "Windows":
-        return os.path.join(sys.prefix, "libs")
+        return os.path.join(get_config_var("installed_base"), "libs")
     else:
-        return get_config_var('LIBDIR')
+        return get_config_var("LIBDIR")
 
 
 def get_ext_suffix(target_platform: str) -> str:

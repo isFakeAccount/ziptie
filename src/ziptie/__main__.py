@@ -31,14 +31,14 @@ mut_ex_group.add_argument(
     "--include-dir",
     help="Get Python include directory",
     dest="include_dir",
-    action='store_true',
+    action="store_true",
 )
 
 mut_ex_group.add_argument(
     "--lib-dir",
     help="Get Python lib directory",
     dest="lib_dir",
-    action='store_true',
+    action="store_true",
 )
 
 
