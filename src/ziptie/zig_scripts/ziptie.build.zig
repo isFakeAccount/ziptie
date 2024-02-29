@@ -12,7 +12,8 @@ const step = std.Build.Step;
 pub const PythonModuleOptions = struct {
     /// Module Path, This path will be used when importing this module. May include packages/namespaces separated by '.'
     module_path: [:0]const u8,
-    root_source_file: std.Build.LazyPath,
+    root_source_file: ?std.Build.LazyPath,
+    c_source_files: []const []const u8,
 
     /// Returns the module name string that will be used to generate filename for the shared library.
     /// Note: This does not include the extension name. That is determined separately based on target os.
@@ -72,14 +73,19 @@ pub const ZiptieBuildConfig = struct {
 
         const ext_module_lib = b.addSharedLibrary(.{
             .name = short_name,
+            .root_source_file = if (options.root_source_file == null) null else options.root_source_file,
             .link_libc = true,
-            .root_source_file = options.root_source_file,
             .target = self.*.target,
             .optimize = self.*.optimization,
         });
 
         ext_module_lib.addIncludePath(.{ .path = self.python_include_dir });
         ext_module_lib.addRPath(LazyPath{ .path = self.*.python_include_dir });
+        const flags = [_][]const u8{};
+        ext_module_lib.addCSourceFiles(
+            options.c_source_files,
+            &flags,
+        );
         ext_module_lib.linker_allow_shlib_undefined = true;
 
         // renaming the shared library based on target and module
